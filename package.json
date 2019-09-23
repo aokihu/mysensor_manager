@@ -1,0 +1,27 @@
+{
+  "name": "mysensor_manager",
+  "version": "1.0.0",
+  "description": "MySensor serial gateway manager",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aokihu/mysensor_manager.git"
+  },
+  "keywords": [
+    "mysensor",
+    "iot",
+    "serial"
+  ],
+  "author": "aokihu",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aokihu/mysensor_manager/issues"
+  },
+  "homepage": "https://github.com/aokihu/mysensor_manager#readme",
+  "dependencies": {
+    "node-mysensor": "^2.1.6"
+  }
+}
