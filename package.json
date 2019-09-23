@@ -22,6 +22,8 @@
   },
   "homepage": "https://github.com/aokihu/mysensor_manager#readme",
   "dependencies": {
-    "node-mysensor": "^2.1.13"
+    "@types/table": "^4.0.7",
+    "node-mysensor": "^2.1.13",
+    "table": "^5.4.6"
   }
 }

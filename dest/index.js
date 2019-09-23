@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_mysensor_1 = __importDefault(require("node-mysensor"));
 const message_1 = require("node-mysensor/dest/libs/message");
 const events_1 = __importDefault(require("events"));
+const table_1 = require("table");
 /**
  * @class
  */
@@ -23,6 +24,8 @@ class Manager extends events_1.default {
         this.sensor.on('presentation', this.processPresentation.bind(this));
         this.sensor.on('internal', this.processInternal.bind(this));
         this.sensor.on('set', this.processSet.bind(this));
+        // Start nodes life cycle
+        setInterval(this.lifeCycle.bind(this), Manager.CYCLE_LIFE);
     }
     /// PUBLIC FUNCTIONS
     /**
@@ -41,7 +44,24 @@ class Manager extends events_1.default {
     getNodeById(id) {
         return this.nodes.find(n => n.id === id);
     }
+    sendDiscoverRequest(nodeID) {
+        this.sensor.send(nodeID, 255, message_1.MysensorCommand.internal, message_1.MysensorAck.NO, message_1.MysensorInterType.I_DISCOVER_REQUEST, '');
+    }
     /// PRIVATE FUNCTIONS
+    lifeCycle() {
+        this.nodes.forEach(n => {
+            if (n.id === 0)
+                return false; // For special gateway node, which id is 0
+            if (n.life === 0) {
+                n.alive = false;
+                this.emit('offline', n);
+                return false;
+            }
+            n.life -= 1;
+        });
+        if (Manager.FORMAT_DEBUG)
+            this.formatOutpu();
+    }
     /**
      *
      * @param message Mysensor parsed struct data
@@ -85,18 +105,40 @@ class Manager extends events_1.default {
             case message_1.MysensorInterType.I_SKETCH_VERSION:
                 this.internalSketchVersion(message);
                 break;
+            case message_1.MysensorInterType.I_HEARTBEAT_RESPONSE:
+                this.internalHeartbeatResponse(message);
+                break;
         }
     }
     interalRequestNodeID(message) {
         if (Manager.DEBUG)
             console.log("Request Node ID", message);
         const { nodeID, childID } = message;
+        // Checkt nodeID is not used
+        const idx = this.nodes.findIndex(n => n.id === childID);
+        // Exit when any node used the same id
+        if (idx > -1)
+            return false;
+        // Send new nodeID to target node
         this.sensor.send(nodeID, childID, message_1.MysensorCommand.internal, message_1.MysensorAck.NO, message_1.MysensorInterType.I_ID_RESPONSE, childID);
+    }
+    internalHeartbeatRequest(message) {
+        const { nodeID, payload, ack } = message;
+        const node = this.getNodeById(nodeID);
+        if (node) {
+            node.life = 60;
+            node.alive = true;
+            if (Manager.DEBUG)
+                console.log("Heartbeat Request", node);
+            if (ack === message_1.MysensorAck.YES) {
+                this.sensor.send(nodeID, 255, message_1.MysensorCommand.internal, message_1.MysensorAck.YES, message_1.MysensorInterType.I_HEARTBEAT_RESPONSE, '');
+            }
+        }
     }
     internalSketchName(message) {
         // Find the node with nodID
         const { nodeID, payload } = message;
-        const node = this.nodes.find(n => n.id === nodeID);
+        const node = this.getNodeById(nodeID);
         if (node) {
             node.sketchName = payload;
             if (Manager.DEBUG)
@@ -112,6 +154,14 @@ class Manager extends events_1.default {
                 console.log("Sketch Version", node);
         }
     }
+    internalHeartbeatResponse(message) {
+        const { nodeID } = message;
+        const node = this.getNodeById(nodeID);
+        if (node) {
+            node.life = 60;
+            node.alive = true;
+        }
+    }
     /// EVENT SET PROCESS
     /**
      * @event update
@@ -123,7 +173,7 @@ class Manager extends events_1.default {
         if (node) {
             const child = node.children.find(n => n.id === childID);
             if (child) {
-                child.value = payload;
+                child.value = this.analysisedPayload(payload);
                 child.stamptime = Date.now();
                 // Emit 'update' with node
                 this.emit('update', node, child, child.value);
@@ -131,8 +181,43 @@ class Manager extends events_1.default {
                     console.log("SET", child);
             }
         }
+        else {
+            //
+            // Request the node sketch information
+            //
+            this.sendDiscoverRequest(nodeID);
+        }
+    }
+    /**
+     * @private
+     * @function
+     * @param data Payload data
+     * @description analysis payload data then tranfrom the payload data type
+     */
+    analysisedPayload(data) {
+        if (/^\D+$/.test(data)) {
+            return data;
+        }
+        else {
+            return Number(data);
+        }
+    }
+    formatOutpu() {
+        const output = [];
+        output.push(['NodeID', 'ChildID', "Alive", "Life", "Sketch Name", "Sketch Version", "TYPE", "VALUE"]);
+        this.nodes.forEach((n) => {
+            const { id: nodeID, children, alive, life, sketchName, sketchVersion } = n;
+            children.forEach((c) => {
+                const { id: childID, value, type } = c;
+                output.push([nodeID, childID, alive, life, sketchName, sketchVersion, type, value]);
+            });
+        });
+        const str = table_1.table(output);
+        console.log(str);
     }
 }
-Manager.DEBUG = false;
-Manager.MAX_LIFE = 60;
 exports.default = Manager;
+Manager.DEBUG = false;
+Manager.FORMAT_DEBUG = false;
+Manager.MAX_LIFE = 60;
+Manager.CYCLE_LIFE = 1000; // Reduce life cycle, unit is ms

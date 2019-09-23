@@ -1,7 +1,8 @@
 import MySensor from 'node-mysensor'
-import { IMysensorMessage, MysensorCommand, MysensorInterType, MysensorAck } from 'node-mysensor/dest/libs/message'
+import { IMysensorMessage, MysensorCommand, MysensorInterType, MysensorAck, MysensorDeviceType } from 'node-mysensor/dest/libs/message'
 import EventEmitter from 'events'
 import { MySensorNode, MySensorNodeChild } from './type';
+import {table} from 'table';
 
 /**
  * @class
@@ -9,7 +10,9 @@ import { MySensorNode, MySensorNodeChild } from './type';
 export default class Manager extends EventEmitter {
 
   static DEBUG: boolean = false;
+  static FORMAT_DEBUG: boolean = false;
   static MAX_LIFE: number = 60;
+  static CYCLE_LIFE: number = 1000; // Reduce life cycle, unit is ms
 
   private sensor: MySensor;
   private nodes: MySensorNode[];
@@ -29,6 +32,9 @@ export default class Manager extends EventEmitter {
     this.sensor.on('presentation', this.processPresentation.bind(this));
     this.sensor.on('internal', this.processInternal.bind(this));
     this.sensor.on('set', this.processSet.bind(this));
+
+    // Start nodes life cycle
+    setInterval(this.lifeCycle.bind(this), Manager.CYCLE_LIFE);
   }
 
   /// PUBLIC FUNCTIONS
@@ -51,7 +57,37 @@ export default class Manager extends EventEmitter {
     return this.nodes.find(n => n.id === id);
   }
 
+  public sendDiscoverRequest(nodeID:number) {
+    this.sensor.send(
+      nodeID,
+      255,
+      MysensorCommand.internal,
+      MysensorAck.NO,
+      MysensorInterType.I_DISCOVER_REQUEST,
+      '');
+  }
+
   /// PRIVATE FUNCTIONS
+
+
+  private lifeCycle(){
+
+    this.nodes.forEach(n => {
+
+      if(n.id === 0) return false; // For special gateway node, which id is 0
+
+      if(n.life === 0) {
+        n.alive = false;
+        this.emit('offline', n);
+        return false;
+      }
+
+      n.life -= 1;
+    })
+
+    if(Manager.FORMAT_DEBUG) this.formatOutpu();
+
+  }
 
   /**
    *
@@ -100,13 +136,24 @@ export default class Manager extends EventEmitter {
       case MysensorInterType.I_SKETCH_VERSION:
         this.internalSketchVersion(message);
         break;
+      case MysensorInterType.I_HEARTBEAT_RESPONSE:
+        this.internalHeartbeatResponse(message);
+        break;
     }
   }
 
-  private interalRequestNodeID(message: IMysensorMessage): void {
+  private interalRequestNodeID(message: IMysensorMessage): void | boolean {
     if (Manager.DEBUG) console.log("Request Node ID", message)
 
     const { nodeID, childID } = message;
+
+    // Checkt nodeID is not used
+    const idx = this.nodes.findIndex(n=> n.id === childID)
+
+    // Exit when any node used the same id
+    if(idx > -1) return false;
+
+    // Send new nodeID to target node
     this.sensor.send(
       nodeID,
       childID,
@@ -116,14 +163,37 @@ export default class Manager extends EventEmitter {
       childID);
   }
 
+  private internalHeartbeatRequest(message: IMysensorMessage): void {
+    const {nodeID, payload, ack} = message;
+
+    const node = this.getNodeById(nodeID);
+
+    if(node) {
+      node.life = 60;
+      node.alive = true;
+
+      if(Manager.DEBUG) console.log("Heartbeat Request", node);
+
+      if(ack === MysensorAck.YES) {
+        this.sensor.send(
+          nodeID,
+          255,
+          MysensorCommand.internal,
+          MysensorAck.YES,
+          MysensorInterType.I_HEARTBEAT_RESPONSE,
+          '');
+      }
+
+    }
+  }
+
   private internalSketchName(message: IMysensorMessage): void {
     // Find the node with nodID
     const { nodeID, payload } = message;
-    const node = this.nodes.find(n => n.id === nodeID);
+    const node = this.getNodeById(nodeID)
 
     if (node) {
       node.sketchName = payload
-
       if (Manager.DEBUG) console.log("Sketch Name", node);
     }
   }
@@ -134,8 +204,18 @@ export default class Manager extends EventEmitter {
 
     if (node) {
       node.sketchVersion = payload;
-
       if (Manager.DEBUG) console.log("Sketch Version", node);
+    }
+  }
+
+  private internalHeartbeatResponse(message: IMysensorMessage): void {
+    const {nodeID} = message;
+
+    const node = this.getNodeById(nodeID);
+
+    if(node) {
+      node.life = 60;
+      node.alive = true;
     }
   }
 
@@ -143,7 +223,7 @@ export default class Manager extends EventEmitter {
 
   /**
    * @event update
-   * @param message 
+   * @param message
    */
   private processSet(message: IMysensorMessage): void {
     const { nodeID, childID, payload } = message;
@@ -154,16 +234,54 @@ export default class Manager extends EventEmitter {
       const child = node.children.find(n => n.id === childID);
 
       if (child) {
-        child.value = payload;
-        child.stamptime = Date.now();
 
+        child.value = this.analysisedPayload(payload);
+        child.stamptime = Date.now();
 
         // Emit 'update' with node
         this.emit('update', node, child, child.value);
 
         if (Manager.DEBUG) console.log("SET", child);
       }
+    } else {
+      //
+      // Request the node sketch information
+      //
+      this.sendDiscoverRequest(nodeID);
     }
+  }
+
+  /**
+   * @private
+   * @function
+   * @param data Payload data
+   * @description analysis payload data then tranfrom the payload data type
+   */
+  private analysisedPayload(data: string) {
+    if(/^\D+$/.test(data)) {
+      return data;
+    } else {
+      return Number(data);
+    }
+  }
+
+  private formatOutpu() {
+
+    const output = [];
+    output.push(['NodeID','ChildID',"Alive","Life","Sketch Name", "Sketch Version", "TYPE", "VALUE"]);
+
+    this.nodes.forEach((n:MySensorNode) => {
+      const {id:nodeID, children, alive, life, sketchName, sketchVersion} = n;
+
+      children.forEach((c:MySensorNodeChild) => {
+        const {id:childID, value, type} = c;
+        output.push([nodeID, childID, alive, life, sketchName, sketchVersion, type, value]);
+      });
+    })
+
+    const str = table(output);
+    console.log(str);
+
   }
 
 }

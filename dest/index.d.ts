@@ -6,7 +6,9 @@ import { MySensorNode } from './type';
  */
 export default class Manager extends EventEmitter {
     static DEBUG: boolean;
+    static FORMAT_DEBUG: boolean;
     static MAX_LIFE: number;
+    static CYCLE_LIFE: number;
     private sensor;
     private nodes;
     /**
@@ -29,6 +31,8 @@ export default class Manager extends EventEmitter {
      * @return MySensorNode
      */
     getNodeById(id: number): MySensorNode | undefined;
+    sendDiscoverRequest(nodeID: number): void;
+    private lifeCycle;
     /**
      *
      * @param message Mysensor parsed struct data
@@ -36,11 +40,21 @@ export default class Manager extends EventEmitter {
     private processPresentation;
     private processInternal;
     private interalRequestNodeID;
+    private internalHeartbeatRequest;
     private internalSketchName;
     private internalSketchVersion;
+    private internalHeartbeatResponse;
     /**
      * @event update
      * @param message
      */
     private processSet;
+    /**
+     * @private
+     * @function
+     * @param data Payload data
+     * @description analysis payload data then tranfrom the payload data type
+     */
+    private analysisedPayload;
+    private formatOutpu;
 }
