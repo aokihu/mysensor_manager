@@ -10,10 +10,12 @@ export interface MySensorNode {
     children: MySensorNodeChild[];
     alive: boolean;
     life: number;
+    battery: number;
 }
 export interface MySensorNodeChild {
     id: number;
     type?: MysensorDeviceType;
+    description?: string;
     value?: any;
     stamptime?: number;
 }

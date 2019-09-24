@@ -47,6 +47,17 @@ class Manager extends events_1.default {
     sendDiscoverRequest(nodeID) {
         this.sensor.send(nodeID, 255, message_1.MysensorCommand.internal, message_1.MysensorAck.NO, message_1.MysensorInterType.I_DISCOVER_REQUEST, '');
     }
+    /**
+     * Send 'set' command to target node's child
+     * @param nodeID Target node id
+     * @param childID Target node's child id
+     * @param type Send data type
+     * @param value New value
+     */
+    setNodeChild(nodeID, childID, type = 24, value) {
+        this.sensor.send(nodeID, childID, message_1.MysensorCommand.set, message_1.MysensorAck.NO, type, // Now it is set '24' Custom Value for any device
+        value);
+    }
     /// PRIVATE FUNCTIONS
     lifeCycle() {
         this.nodes.forEach(n => {
@@ -60,22 +71,22 @@ class Manager extends events_1.default {
             n.life -= 1;
         });
         if (Manager.FORMAT_DEBUG)
-            this.formatOutpu();
+            this.formatOutput();
     }
     /**
      *
      * @param message Mysensor parsed struct data
      */
     processPresentation(message) {
-        const { type, nodeID, childID } = message;
+        const { type, nodeID, childID, payload } = message;
         if (Manager.DEBUG)
             console.log(message);
         // Find node which id is equal nodeID
         const node = this.nodes.find((n) => n.id === nodeID);
         // If not found the node, create a new node
         if (!node) {
-            const newNode = { id: nodeID, children: [], alive: true, life: Manager.MAX_LIFE };
-            const newChild = { id: childID, type, value: 0 };
+            const newNode = { id: nodeID, children: [], alive: true, life: Manager.MAX_LIFE, battery: 100 };
+            const newChild = { id: childID, type, value: 0, description: payload };
             newNode.children.push(newChild);
             this.nodes.push(newNode);
         }
@@ -84,7 +95,7 @@ class Manager extends events_1.default {
             const child = node.children.find(c => c.id === childID);
             // If not found child
             if (!child) {
-                const newChild = { id: childID, type, value: 0 };
+                const newChild = { id: childID, type, value: 0, description: payload };
                 node.children.push(newChild);
             }
         }
@@ -202,14 +213,14 @@ class Manager extends events_1.default {
             return Number(data);
         }
     }
-    formatOutpu() {
+    formatOutput() {
         const output = [];
-        output.push(['NodeID', 'ChildID', "Alive", "Life", "Sketch Name", "Sketch Version", "TYPE", "VALUE"]);
+        output.push(['NodeID', 'ChildID', "Alive", "Life", "Sketch Name", "Sketch Version", "Description", "TYPE", "VALUE"]);
         this.nodes.forEach((n) => {
             const { id: nodeID, children, alive, life, sketchName, sketchVersion } = n;
             children.forEach((c) => {
-                const { id: childID, value, type } = c;
-                output.push([nodeID, childID, alive, life, sketchName, sketchVersion, type, value]);
+                const { id: childID, value, type, description } = c;
+                output.push([nodeID, childID, alive, life, sketchName, sketchVersion, description, type, value]);
             });
         });
         const str = table_1.table(output);

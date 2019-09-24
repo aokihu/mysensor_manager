@@ -67,6 +67,24 @@ export default class Manager extends EventEmitter {
       '');
   }
 
+  /**
+   * Send 'set' command to target node's child
+   * @param nodeID Target node id
+   * @param childID Target node's child id
+   * @param type Send data type
+   * @param value New value
+   */
+  public setNodeChild(nodeID: number, childID: number, type: number = 24, value: number | string): void {
+    this.sensor.send(
+      nodeID,
+      childID,
+      MysensorCommand.set,
+      MysensorAck.NO,
+      type, // Now it is set '24' Custom Value for any device
+      value
+    )
+  }
+
   /// PRIVATE FUNCTIONS
 
 
@@ -85,7 +103,7 @@ export default class Manager extends EventEmitter {
       n.life -= 1;
     })
 
-    if(Manager.FORMAT_DEBUG) this.formatOutpu();
+    if(Manager.FORMAT_DEBUG) this.formatOutput();
 
   }
 
@@ -94,7 +112,7 @@ export default class Manager extends EventEmitter {
    * @param message Mysensor parsed struct data
    */
   private processPresentation(message: IMysensorMessage): void {
-    const { type, nodeID, childID } = message;
+    const { type, nodeID, childID, payload } = message;
     if (Manager.DEBUG) console.log(message);
 
     // Find node which id is equal nodeID
@@ -102,17 +120,18 @@ export default class Manager extends EventEmitter {
 
     // If not found the node, create a new node
     if (!node) {
-      const newNode: MySensorNode = { id: nodeID, children: [], alive: true, life: Manager.MAX_LIFE };
-      const newChild: MySensorNodeChild = { id: childID, type, value: 0 };
+      const newNode: MySensorNode = { id: nodeID, children: [], alive: true, life: Manager.MAX_LIFE, battery: 100 };
+      const newChild: MySensorNodeChild = { id: childID, type, value: 0, description: payload };
       newNode.children.push(newChild);
       this.nodes.push(newNode);
     } else {
+
       // Find the child
       const child = node.children.find(c => c.id === childID);
 
       // If not found child
       if (!child) {
-        const newChild: MySensorNodeChild = { id: childID, type, value: 0 };
+        const newChild: MySensorNodeChild = { id: childID, type, value: 0, description: payload };
         node.children.push(newChild);
       }
     }
@@ -265,17 +284,17 @@ export default class Manager extends EventEmitter {
     }
   }
 
-  private formatOutpu() {
+  private formatOutput() {
 
     const output = [];
-    output.push(['NodeID','ChildID',"Alive","Life","Sketch Name", "Sketch Version", "TYPE", "VALUE"]);
+    output.push(['NodeID','ChildID',"Alive","Life","Sketch Name", "Sketch Version","Description", "TYPE", "VALUE"]);
 
     this.nodes.forEach((n:MySensorNode) => {
       const {id:nodeID, children, alive, life, sketchName, sketchVersion} = n;
 
       children.forEach((c:MySensorNodeChild) => {
-        const {id:childID, value, type} = c;
-        output.push([nodeID, childID, alive, life, sketchName, sketchVersion, type, value]);
+        const {id:childID, value, type, description} = c;
+        output.push([nodeID, childID, alive, life, sketchName, sketchVersion, description,type, value]);
       });
     })
 

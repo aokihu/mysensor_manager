@@ -32,6 +32,14 @@ export default class Manager extends EventEmitter {
      */
     getNodeById(id: number): MySensorNode | undefined;
     sendDiscoverRequest(nodeID: number): void;
+    /**
+     * Send 'set' command to target node's child
+     * @param nodeID Target node id
+     * @param childID Target node's child id
+     * @param type Send data type
+     * @param value New value
+     */
+    setNodeChild(nodeID: number, childID: number, type: number | undefined, value: number | string): void;
     private lifeCycle;
     /**
      *
@@ -56,5 +64,5 @@ export default class Manager extends EventEmitter {
      * @description analysis payload data then tranfrom the payload data type
      */
     private analysisedPayload;
-    private formatOutpu;
+    private formatOutput;
 }
