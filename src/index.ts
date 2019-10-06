@@ -22,7 +22,7 @@ export default class Manager extends EventEmitter {
    * @param port Serial interface path name
    * @param baudrate Serial communication speed
    */
-  constructor(port: string, baudrate: number) {
+  constructor(port: string, baudrate: number = 115200) {
     super();
 
     MySensor.DEBUG = Manager.DEBUG;
