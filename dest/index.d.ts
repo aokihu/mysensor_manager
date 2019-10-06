@@ -31,6 +31,13 @@ export default class Manager extends EventEmitter {
      * @return MySensorNode
      */
     getNodeById(id: number): MySensorNode | undefined;
+    /**
+     * @public
+     * @function
+     * @param nodeID Target node's id
+     * @description Send discover signal to target node,
+     *              the target node should send presentation to gateway
+     */
     sendDiscoverRequest(nodeID: number): void;
     /**
      * Send 'set' command to target node's child
@@ -40,6 +47,13 @@ export default class Manager extends EventEmitter {
      * @param value New value
      */
     setNodeChild(nodeID: number, childID: number, type: number | undefined, value: number | string): void;
+    /**
+     * @public
+     * @function
+     * @param nodeID Target node's id
+     * @description Send reboot command to target node
+     */
+    rebootNode(nodeID: number): void;
     private lifeCycle;
     /**
      *

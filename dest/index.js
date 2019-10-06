@@ -44,6 +44,13 @@ class Manager extends events_1.default {
     getNodeById(id) {
         return this.nodes.find(n => n.id === id);
     }
+    /**
+     * @public
+     * @function
+     * @param nodeID Target node's id
+     * @description Send discover signal to target node,
+     *              the target node should send presentation to gateway
+     */
     sendDiscoverRequest(nodeID) {
         this.sensor.send(nodeID, 255, message_1.MysensorCommand.internal, message_1.MysensorAck.NO, message_1.MysensorInterType.I_DISCOVER_REQUEST, '');
     }
@@ -57,6 +64,16 @@ class Manager extends events_1.default {
     setNodeChild(nodeID, childID, type = 24, value) {
         this.sensor.send(nodeID, childID, message_1.MysensorCommand.set, message_1.MysensorAck.NO, type, // Now it is set '24' Custom Value for any device
         value);
+    }
+    /**
+     * @public
+     * @function
+     * @param nodeID Target node's id
+     * @description Send reboot command to target node
+     */
+    rebootNode(nodeID) {
+        this.sensor.send(nodeID, 255, message_1.MysensorCommand.internal, message_1.MysensorAck.NO, message_1.MysensorInterType.I_REBOOT, // Now it is set '24' Custom Value for any device
+        '');
     }
     /// PRIVATE FUNCTIONS
     lifeCycle() {

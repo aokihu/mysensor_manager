@@ -57,6 +57,13 @@ export default class Manager extends EventEmitter {
     return this.nodes.find(n => n.id === id);
   }
 
+  /**
+   * @public
+   * @function
+   * @param nodeID Target node's id
+   * @description Send discover signal to target node,
+   *              the target node should send presentation to gateway
+   */
   public sendDiscoverRequest(nodeID:number) {
     this.sensor.send(
       nodeID,
@@ -82,6 +89,23 @@ export default class Manager extends EventEmitter {
       MysensorAck.NO,
       type, // Now it is set '24' Custom Value for any device
       value
+    )
+  }
+
+  /**
+   * @public
+   * @function
+   * @param nodeID Target node's id
+   * @description Send reboot command to target node
+   */
+  public rebootNode(nodeID: number) {
+    this.sensor.send(
+      nodeID,
+      255,
+      MysensorCommand.internal,
+      MysensorAck.NO,
+      MysensorInterType.I_REBOOT, // Now it is set '24' Custom Value for any device
+      ''
     )
   }
 
